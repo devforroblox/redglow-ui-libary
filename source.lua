@@ -1,10 +1,11 @@
 --[[
-    RedGlow UI Library
-    A sleek, modern UI library for Roblox with smooth animations and red glowing accents
+    RedGlow UI Library (Enhanced)
+    A sleek, modern UI library for Roblox with ultra-smooth animations and red glowing accents
     
     Features:
     - Smooth grey UI with red glowing edges
-    - Animated UI elements with sound effects
+    - Premium-quality animations with advanced tweening
+    - Enhanced scrolling with momentum and inertia
     - Comprehensive set of UI components
     - Easy to use API
     
@@ -19,13 +20,22 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TextService = game:GetService("TextService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
 -- Constants
-local TWEEN_TIME = 0.3
-local EASING_STYLE = Enum.EasingStyle.Quart
-local EASING_DIRECTION = Enum.EasingDirection.Out
+local TWEEN_INFO = {
+    Fast = TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    Medium = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    Slow = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    VeryFast = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    Bounce = TweenInfo.new(0.5, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out),
+    Elastic = TweenInfo.new(0.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
+    Spring = TweenInfo.new(0.65, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    Linear = TweenInfo.new(0.25, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+}
 
 -- Colors
 local COLORS = {
@@ -50,30 +60,31 @@ local SOUNDS = {
     Hover = "rbxassetid://6895079733",
     Toggle = "rbxassetid://6895079773",
     Notification = "rbxassetid://6895079813",
-    Slider = "rbxassetid://6895079893"
+    Slider = "rbxassetid://6895079893",
+    Whoosh = "rbxassetid://6768783831"
 }
 
 -- Utility Functions
-local function createTween(instance, properties, time, style, direction)
-    time = time or TWEEN_TIME
-    style = style or EASING_STYLE
-    direction = direction or EASING_DIRECTION
+local function createTween(instance, properties, tweenInfo)
+    tweenInfo = tweenInfo or TWEEN_INFO.Medium
     
     local tween = TweenService:Create(
         instance,
-        TweenInfo.new(time, style, direction),
+        tweenInfo,
         properties
     )
     
     return tween
 end
 
-local function playSound(soundId, volume)
+local function playSound(soundId, volume, pitch)
     volume = volume or 0.5
+    pitch = pitch or 1
     
     local sound = Instance.new("Sound")
     sound.SoundId = soundId
     sound.Volume = volume
+    sound.PlaybackSpeed = pitch
     sound.Parent = workspace
     
     sound:Play()
@@ -81,12 +92,13 @@ local function playSound(soundId, volume)
     game:GetService("Debris"):AddItem(sound, sound.TimeLength + 0.1)
 end
 
-local function createShadow(parent, size, position, radius)
+local function createShadow(parent, size, position, transparency)
     local shadow = Instance.new("ImageLabel")
     shadow.Name = "Shadow"
     shadow.BackgroundTransparency = 1
     shadow.Image = "rbxassetid://5554236805"
     shadow.ImageColor3 = COLORS.Shadow
+    shadow.ImageTransparency = transparency or 0.4
     shadow.ScaleType = Enum.ScaleType.Slice
     shadow.SliceCenter = Rect.new(23, 23, 277, 277)
     shadow.SliceScale = 1
@@ -98,12 +110,13 @@ local function createShadow(parent, size, position, radius)
     return shadow
 end
 
-local function createGlow(parent, size, position, radius)
+local function createGlow(parent, size, position, transparency)
     local glow = Instance.new("ImageLabel")
     glow.Name = "Glow"
     glow.BackgroundTransparency = 1
     glow.Image = "rbxassetid://5554236805"
     glow.ImageColor3 = COLORS.Glow
+    glow.ImageTransparency = transparency or 0.5
     glow.ScaleType = Enum.ScaleType.Slice
     glow.SliceCenter = Rect.new(23, 23, 277, 277)
     glow.SliceScale = 1
@@ -112,7 +125,7 @@ local function createGlow(parent, size, position, radius)
     glow.ZIndex = parent.ZIndex - 1
     glow.Parent = parent
     
-    -- Add animation
+    -- Add pulsing animation
     local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
     local tween = TweenService:Create(glow, tweenInfo, {ImageTransparency = 0.7})
     tween:Play()
@@ -120,15 +133,28 @@ local function createGlow(parent, size, position, radius)
     return glow
 end
 
-local function createRipple(parent)
+local function createRipple(parent, startPos)
     local ripple = Instance.new("Frame")
     ripple.Name = "Ripple"
     ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ripple.BackgroundTransparency = 0.8
+    ripple.BackgroundTransparency = 0.85
     ripple.BorderSizePixel = 0
     ripple.ZIndex = parent.ZIndex + 1
-    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
-    ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+    
+    -- If startPos is provided, create ripple at that position
+    if startPos then
+        local relativePos = Vector2.new(
+            startPos.X - parent.AbsolutePosition.X,
+            startPos.Y - parent.AbsolutePosition.Y
+        )
+        
+        ripple.Position = UDim2.new(0, relativePos.X, 0, relativePos.Y)
+        ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    else
+        ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+        ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    end
+    
     ripple.Size = UDim2.new(0, 0, 0, 0)
     
     local corner = Instance.new("UICorner")
@@ -137,13 +163,139 @@ local function createRipple(parent)
     
     ripple.Parent = parent
     
-    local targetSize = UDim2.new(0, parent.AbsoluteSize.X * 1.5, 0, parent.AbsoluteSize.X * 1.5)
-    local tween = createTween(ripple, {Size = targetSize, BackgroundTransparency = 1}, 0.5)
-    tween:Play()
+    -- Calculate the maximum distance to any corner
+    local width, height = parent.AbsoluteSize.X, parent.AbsoluteSize.Y
+    local maxDistance = math.sqrt(width^2 + height^2) * 1.5
     
-    tween.Completed:Connect(function()
+    -- Create ripple animation
+    local targetSize = UDim2.new(0, maxDistance, 0, maxDistance)
+    local growTween = createTween(ripple, {Size = targetSize}, TWEEN_INFO.Slow)
+    local fadeTween = createTween(ripple, {BackgroundTransparency = 1}, TWEEN_INFO.Slow)
+    
+    growTween:Play()
+    fadeTween:Play()
+    
+    fadeTween.Completed:Connect(function()
         ripple:Destroy()
     end)
+end
+
+local function createStroke(parent, color, thickness, transparency)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or COLORS.Accent
+    stroke.Thickness = thickness or 1
+    stroke.Transparency = transparency or 0
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = parent
+    
+    return stroke
+end
+
+local function createScrollingFrame(parent, position, size, zIndex)
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.Position = position
+    scrollFrame.Size = size
+    scrollFrame.ZIndex = zIndex
+    scrollFrame.ScrollBarThickness = 3
+    scrollFrame.ScrollBarImageColor3 = COLORS.Accent
+    scrollFrame.ScrollBarImageTransparency = 0.5
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = parent
+    
+    -- Add smooth scrolling
+    local function smoothScroll(frame)
+        local targetPosition = frame.CanvasPosition
+        local currentPosition = frame.CanvasPosition
+        local velocity = Vector2.new(0, 0)
+        local damping = 0.9
+        local stiffness = 0.15
+        
+        local connection
+        connection = RunService.RenderStepped:Connect(function(deltaTime)
+            if not frame or not frame.Parent then
+                connection:Disconnect()
+                return
+            end
+            
+            local force = (targetPosition - currentPosition) * stiffness
+            velocity = velocity * damping + force
+            
+            if velocity.Magnitude < 0.1 and (targetPosition - currentPosition).Magnitude < 0.1 then
+                currentPosition = targetPosition
+                connection:Disconnect()
+            else
+                currentPosition = currentPosition + velocity
+                frame.CanvasPosition = currentPosition
+            end
+        end)
+        
+        frame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+            if frame.CanvasPosition ~= currentPosition then
+                targetPosition = frame.CanvasPosition
+            end
+        end)
+        
+        -- Handle mouse wheel scrolling
+        frame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseWheel then
+                local scrollAmount = input.Position.Z * 80
+                targetPosition = Vector2.new(
+                    targetPosition.X,
+                    math.clamp(targetPosition.Y - scrollAmount, 0, frame.CanvasSize.Y.Offset - frame.AbsoluteSize.Y)
+                )
+            end
+        end)
+        
+        -- Handle touch scrolling with inertia
+        local isDragging = false
+        local lastPosition = nil
+        local lastUpdateTime = tick()
+        local dragVelocity = Vector2.new(0, 0)
+        
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = true
+                lastPosition = input.Position
+                lastUpdateTime = tick()
+                dragVelocity = Vector2.new(0, 0)
+            end
+        end)
+        
+        frame.InputChanged:Connect(function(input)
+            if isDragging and input.UserInputType == Enum.UserInputType.Touch then
+                local delta = input.Position - lastPosition
+                local timeDelta = tick() - lastUpdateTime
+                
+                if timeDelta > 0 then
+                    dragVelocity = delta / timeDelta
+                end
+                
+                targetPosition = Vector2.new(
+                    targetPosition.X,
+                    math.clamp(targetPosition.Y - delta.Y, 0, frame.CanvasSize.Y.Offset - frame.AbsoluteSize.Y)
+                )
+                
+                lastPosition = input.Position
+                lastUpdateTime = tick()
+            end
+        end)
+        
+        frame.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = false
+                
+                -- Apply inertia
+                local inertiaFactor = 0.2
+                velocity = dragVelocity * inertiaFactor
+            end
+        end)
+    end
+    
+    smoothScroll(scrollFrame)
+    
+    return scrollFrame
 end
 
 -- Main UI Creation
@@ -160,7 +312,13 @@ function RedGlowUI.new(title, draggable)
     if RunService:IsStudio() then
         self.ScreenGui.Parent = LocalPlayer.PlayerGui
     else
-        self.ScreenGui.Parent = game:GetService("CoreGui")
+        pcall(function()
+            self.ScreenGui.Parent = CoreGui
+        end)
+        
+        if not self.ScreenGui.Parent then
+            self.ScreenGui.Parent = LocalPlayer.PlayerGui
+        end
     end
     
     -- Create main frame
@@ -180,10 +338,10 @@ function RedGlowUI.new(title, draggable)
     corner.Parent = self.Main
     
     -- Add shadow
-    createShadow(self.Main)
+    createShadow(self.Main, UDim2.new(1, 30, 1, 30), UDim2.new(0, -15, 0, -15), 0.3)
     
     -- Add glow
-    self.Glow = createGlow(self.Main)
+    self.Glow = createGlow(self.Main, UDim2.new(1, 40, 1, 40), UDim2.new(0, -20, 0, -20), 0.4)
     
     -- Create title bar
     self.TitleBar = Instance.new("Frame")
@@ -237,25 +395,34 @@ function RedGlowUI.new(title, draggable)
     
     -- Close button hover effect
     self.CloseButton.MouseEnter:Connect(function()
-        createTween(self.CloseButton, {TextColor3 = COLORS.Accent}):Play()
+        createTween(self.CloseButton, {TextColor3 = COLORS.Accent}, TWEEN_INFO.Fast):Play()
         playSound(SOUNDS.Hover, 0.2)
     end)
     
     self.CloseButton.MouseLeave:Connect(function()
-        createTween(self.CloseButton, {TextColor3 = COLORS.TextDark}):Play()
+        createTween(self.CloseButton, {TextColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
     end)
     
     -- Close button click
     self.CloseButton.MouseButton1Click:Connect(function()
         playSound(SOUNDS.Click)
-        createTween(self.Main, {Size = UDim2.new(0, self.Main.AbsoluteSize.X, 0, 0), Position = UDim2.new(self.Main.Position.X.Scale, self.Main.Position.X.Offset, self.Main.Position.Y.Scale, self.Main.Position.Y.Offset + self.Main.AbsoluteSize.Y/2)}, 0.5):Play()
-        createTween(self.Main, {BackgroundTransparency = 1}, 0.5):Play()
-        createTween(self.TitleBar, {BackgroundTransparency = 1}, 0.5):Play()
-        createTween(self.Title, {TextTransparency = 1}, 0.5):Play()
-        createTween(self.CloseButton, {TextTransparency = 1}, 0.5):Play()
-        createTween(self.Glow, {ImageTransparency = 1}, 0.5):Play()
+        createRipple(self.CloseButton)
         
-        wait(0.5)
+        -- Animate close
+        local closeTweens = {
+            createTween(self.Main, {Size = UDim2.new(0, self.Main.AbsoluteSize.X, 0, 0), Position = UDim2.new(self.Main.Position.X.Scale, self.Main.Position.X.Offset, self.Main.Position.Y.Scale, self.Main.Position.Y.Offset + self.Main.AbsoluteSize.Y/2)}, TWEEN_INFO.Spring),
+            createTween(self.Main, {BackgroundTransparency = 1}, TWEEN_INFO.Medium),
+            createTween(self.TitleBar, {BackgroundTransparency = 1}, TWEEN_INFO.Medium),
+            createTween(self.Title, {TextTransparency = 1}, TWEEN_INFO.Medium),
+            createTween(self.CloseButton, {TextTransparency = 1}, TWEEN_INFO.Medium),
+            createTween(self.Glow, {ImageTransparency = 1}, TWEEN_INFO.Medium)
+        }
+        
+        for _, tween in ipairs(closeTweens) do
+            tween:Play()
+        end
+        
+        wait(0.6)
         self.ScreenGui:Destroy()
     end)
     
@@ -292,23 +459,23 @@ function RedGlowUI.new(title, draggable)
     tabFix.ZIndex = 3
     tabFix.Parent = self.TabButtons
     
-    -- Create tab button list
-    self.TabButtonList = Instance.new("ScrollingFrame")
-    self.TabButtonList.Name = "TabButtonList"
-    self.TabButtonList.BackgroundTransparency = 1
-    self.TabButtonList.Position = UDim2.new(0, 0, 0, 10)
-    self.TabButtonList.Size = UDim2.new(1, 0, 1, -10)
-    self.TabButtonList.ZIndex = 4
-    self.TabButtonList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    self.TabButtonList.ScrollBarThickness = 2
-    self.TabButtonList.ScrollBarImageColor3 = COLORS.Accent
-    self.TabButtonList.BorderSizePixel = 0
-    self.TabButtonList.Parent = self.TabButtons
+    -- Create tab button list with enhanced scrolling
+    self.TabButtonList = createScrollingFrame(
+        self.TabButtons,
+        UDim2.new(0, 0, 0, 10),
+        UDim2.new(1, 0, 1, -10),
+        4
+    )
     
     local tabListLayout = Instance.new("UIListLayout")
     tabListLayout.Padding = UDim.new(0, 5)
     tabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     tabListLayout.Parent = self.TabButtonList
+    
+    -- Auto-adjust canvas size
+    tabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        self.TabButtonList.CanvasSize = UDim2.new(0, 0, 0, tabListLayout.AbsoluteContentSize.Y + 10)
+    end)
     
     -- Create tab content frame
     self.TabContent = Instance.new("Frame")
@@ -327,21 +494,30 @@ function RedGlowUI.new(title, draggable)
         local startPos
         
         self.TitleBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging = true
                 dragStart = input.Position
                 startPos = self.Main.Position
                 
+                -- Play subtle sound
+                playSound(SOUNDS.Whoosh, 0.15, 1.2)
+                
+                -- Add subtle scale effect
+                createTween(self.Main, {Size = UDim2.new(0, self.Main.AbsoluteSize.X * 0.98, 0, self.Main.AbsoluteSize.Y * 0.98)}, TWEEN_INFO.VeryFast):Play()
+                
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         dragging = false
+                        
+                        -- Restore size with bounce effect
+                        createTween(self.Main, {Size = UDim2.new(0, self.Main.AbsoluteSize.X / 0.98, 0, self.Main.AbsoluteSize.Y / 0.98)}, TWEEN_INFO.Spring):Play()
                     end
                 end)
             end
         end)
         
         self.TitleBar.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
                 dragInput = input
             end
         end)
@@ -349,7 +525,10 @@ function RedGlowUI.new(title, draggable)
         UserInputService.InputChanged:Connect(function(input)
             if input == dragInput and dragging then
                 local delta = input.Position - dragStart
-                self.Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                
+                -- Smooth drag with tweening
+                createTween(self.Main, {Position = targetPos}, TWEEN_INFO.VeryFast):Play()
             end
         end)
     end
@@ -361,7 +540,25 @@ function RedGlowUI.new(title, draggable)
     -- Play open animation
     self.Main.Size = UDim2.new(0, 500, 0, 0)
     self.Main.Position = UDim2.new(0.5, -250, 0.5, 0)
-    createTween(self.Main, {Size = UDim2.new(0, 500, 0, 350), Position = UDim2.new(0.5, -250, 0.5, -175)}, 0.5):Play()
+    self.Main.BackgroundTransparency = 1
+    self.TitleBar.BackgroundTransparency = 1
+    self.Title.TextTransparency = 1
+    self.CloseButton.TextTransparency = 1
+    self.Glow.ImageTransparency = 1
+    
+    -- Sequence of animations
+    wait(0.1)
+    createTween(self.Main, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(self.Main, {Size = UDim2.new(0, 500, 0, 350), Position = UDim2.new(0.5, -250, 0.5, -175)}, TWEEN_INFO.Spring):Play()
+    wait(0.2)
+    createTween(self.TitleBar, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(self.Title, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(self.CloseButton, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(self.Glow, {ImageTransparency = 0.5}, TWEEN_INFO.Slow):Play()
+    
+    -- Play sound
+    playSound(SOUNDS.Whoosh, 0.3)
     
     return self
 end
@@ -392,18 +589,32 @@ function RedGlowUI:AddTab(name, icon)
     tabIndicator.ZIndex = 5
     tabIndicator.Parent = tabButton
     
-    -- Create tab content
-    local tabContent = Instance.new("ScrollingFrame")
+    -- Add icon if provided
+    if icon then
+        local iconImage = Instance.new("ImageLabel")
+        iconImage.Name = "Icon"
+        iconImage.BackgroundTransparency = 1
+        iconImage.Position = UDim2.new(0, 5, 0.5, -8)
+        iconImage.Size = UDim2.new(0, 16, 0, 16)
+        iconImage.ZIndex = 5
+        iconImage.Image = icon
+        iconImage.ImageColor3 = COLORS.TextDark
+        iconImage.Parent = tabButton
+        
+        -- Adjust text position
+        tabButton.TextXAlignment = Enum.TextXAlignment.Right
+        tabButton.Text = "  " .. name
+    end
+    
+    -- Create tab content with enhanced scrolling
+    local tabContent = createScrollingFrame(
+        self.TabContent,
+        UDim2.new(0, 0, 0, 0),
+        UDim2.new(1, 0, 1, 0),
+        3
+    )
     tabContent.Name = name .. "Content"
-    tabContent.BackgroundTransparency = 1
-    tabContent.BorderSizePixel = 0
-    tabContent.Size = UDim2.new(1, 0, 1, 0)
-    tabContent.ZIndex = 3
-    tabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    tabContent.ScrollBarThickness = 2
-    tabContent.ScrollBarImageColor3 = COLORS.Accent
     tabContent.Visible = false
-    tabContent.Parent = self.TabContent
     
     -- Add padding
     local contentPadding = Instance.new("UIPadding")
@@ -427,22 +638,36 @@ function RedGlowUI:AddTab(name, icon)
     -- Tab button hover effect
     tabButton.MouseEnter:Connect(function()
         if self.ActiveTab ~= name then
-            createTween(tabButton, {TextColor3 = COLORS.Text}):Play()
-            createTween(tabIndicator, {Size = UDim2.new(0, 2, 0, 10)}):Play()
+            createTween(tabButton, {TextColor3 = COLORS.Text}, TWEEN_INFO.Fast):Play()
+            createTween(tabIndicator, {Size = UDim2.new(0, 2, 0, 10)}, TWEEN_INFO.Fast):Play()
+            
+            -- Animate icon if present
+            local icon = tabButton:FindFirstChild("Icon")
+            if icon then
+                createTween(icon, {ImageColor3 = COLORS.Text}, TWEEN_INFO.Fast):Play()
+            end
+            
             playSound(SOUNDS.Hover, 0.2)
         end
     end)
     
     tabButton.MouseLeave:Connect(function()
         if self.ActiveTab ~= name then
-            createTween(tabButton, {TextColor3 = COLORS.TextDark}):Play()
-            createTween(tabIndicator, {Size = UDim2.new(0, 2, 0, 0)}):Play()
+            createTween(tabButton, {TextColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
+            createTween(tabIndicator, {Size = UDim2.new(0, 2, 0, 0)}, TWEEN_INFO.Fast):Play()
+            
+            -- Animate icon if present
+            local icon = tabButton:FindFirstChild("Icon")
+            if icon then
+                createTween(icon, {ImageColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
+            end
         end
     end)
     
     -- Tab button click
     tabButton.MouseButton1Click:Connect(function()
         playSound(SOUNDS.Click)
+        createRipple(tabButton)
         self:SelectTab(name)
     end)
     
@@ -474,16 +699,43 @@ function RedGlowUI:SelectTab(name)
     -- Deselect current tab
     if self.ActiveTab then
         local currentTab = self.Tabs[self.ActiveTab]
-        createTween(currentTab.Button, {TextColor3 = COLORS.TextDark}):Play()
-        createTween(currentTab.Indicator, {Size = UDim2.new(0, 2, 0, 0)}):Play()
+        
+        -- Animate tab button
+        createTween(currentTab.Button, {TextColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
+        createTween(currentTab.Indicator, {Size = UDim2.new(0, 2, 0, 0)}, TWEEN_INFO.Fast):Play()
+        
+        -- Animate icon if present
+        local currentIcon = currentTab.Button:FindFirstChild("Icon")
+        if currentIcon then
+            createTween(currentIcon, {ImageColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
+        end
+        
+        -- Fade out content
+        createTween(currentTab.Content, {Position = UDim2.new(0.05, 0, 0, 0), BackgroundTransparency = 1}, TWEEN_INFO.Fast):Play()
+        wait(0.1)
         currentTab.Content.Visible = false
     end
     
     -- Select new tab
     local newTab = self.Tabs[name]
-    createTween(newTab.Button, {TextColor3 = COLORS.Accent}):Play()
-    createTween(newTab.Indicator, {Size = UDim2.new(0, 2, 0, 20)}):Play()
+    
+    -- Animate tab button
+    createTween(newTab.Button, {TextColor3 = COLORS.Accent}, TWEEN_INFO.Fast):Play()
+    createTween(newTab.Indicator, {Size = UDim2.new(0, 2, 0, 20)}, TWEEN_INFO.Spring):Play()
+    
+    -- Animate icon if present
+    local newIcon = newTab.Button:FindFirstChild("Icon")
+    if newIcon then
+        createTween(newIcon, {ImageColor3 = COLORS.Accent}, TWEEN_INFO.Fast):Play()
+    end
+    
+    -- Fade in content
+    newTab.Content.Position = UDim2.new(-0.05, 0, 0, 0)
     newTab.Content.Visible = true
+    createTween(newTab.Content, {Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    
+    -- Play sound
+    playSound(SOUNDS.Whoosh, 0.2, 1.1)
     
     -- Set active tab
     self.ActiveTab = name
@@ -509,6 +761,9 @@ function RedGlowUI:AddSection(tabName, title)
     sectionCorner.CornerRadius = UDim.new(0, 6)
     sectionCorner.Parent = section
     
+    -- Add subtle shadow
+    createShadow(section, UDim2.new(1, 10, 1, 10), UDim2.new(0, -5, 0, -5), 0.7)
+    
     -- Create section title
     local sectionTitle = Instance.new("TextLabel")
     sectionTitle.Name = "Title"
@@ -523,11 +778,21 @@ function RedGlowUI:AddSection(tabName, title)
     sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
     sectionTitle.Parent = section
     
+    -- Add accent line
+    local accentLine = Instance.new("Frame")
+    accentLine.Name = "AccentLine"
+    accentLine.BackgroundColor3 = COLORS.Accent
+    accentLine.BorderSizePixel = 0
+    accentLine.Position = UDim2.new(0, 10, 0, 30)
+    accentLine.Size = UDim2.new(0, 30, 0, 1)
+    accentLine.ZIndex = 5
+    accentLine.Parent = section
+    
     -- Create section content
     local sectionContent = Instance.new("Frame")
     sectionContent.Name = "Content"
     sectionContent.BackgroundTransparency = 1
-    sectionContent.Position = UDim2.new(0, 10, 0, 30)
+    sectionContent.Position = UDim2.new(0, 10, 0, 35)
     sectionContent.Size = UDim2.new(1, -20, 0, 0)
     sectionContent.ZIndex = 5
     sectionContent.AutomaticSize = Enum.AutomaticSize.Y
@@ -542,8 +807,19 @@ function RedGlowUI:AddSection(tabName, title)
     -- Auto-size section
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         sectionContent.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-        section.Size = UDim2.new(1, 0, 0, contentLayout.AbsoluteContentSize.Y + 40)
+        section.Size = UDim2.new(1, 0, 0, contentLayout.AbsoluteContentSize.Y + 45)
     end)
+    
+    -- Animate section creation
+    section.BackgroundTransparency = 1
+    sectionTitle.TextTransparency = 1
+    accentLine.BackgroundTransparency = 1
+    
+    createTween(section, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(sectionTitle, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(accentLine, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
     
     -- Return section for chaining
     return {
@@ -606,13 +882,20 @@ function RedGlowUI:AddLabel(parent, text)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = parent
     
+    -- Animate label creation
+    label.TextTransparency = 1
+    createTween(label, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    
     -- Return label for chaining
     return {
         Instance = label,
         
         -- Set text
         SetText = function(_, newText)
+            createTween(label, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+            wait(0.1)
             label.Text = newText
+            createTween(label, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
         end
     }
 end
@@ -639,31 +922,48 @@ function RedGlowUI:AddButton(parent, text, callback)
     buttonCorner.CornerRadius = UDim.new(0, 4)
     buttonCorner.Parent = button
     
+    -- Add subtle stroke
+    local buttonStroke = createStroke(button, COLORS.Accent, 1, 0.7)
+    
     -- Button hover effect
     button.MouseEnter:Connect(function()
-        createTween(button, {BackgroundColor3 = COLORS.Highlight}):Play()
+        createTween(button, {BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.Fast):Play()
+        createTween(buttonStroke, {Transparency = 0.3}, TWEEN_INFO.Fast):Play()
         playSound(SOUNDS.Hover, 0.2)
     end)
     
     button.MouseLeave:Connect(function()
-        createTween(button, {BackgroundColor3 = COLORS.Background}):Play()
+        createTween(button, {BackgroundColor3 = COLORS.Background}, TWEEN_INFO.Fast):Play()
+        createTween(buttonStroke, {Transparency = 0.7}, TWEEN_INFO.Fast):Play()
     end)
     
     -- Button click effect
     button.MouseButton1Down:Connect(function()
-        createTween(button, {BackgroundColor3 = COLORS.DarkBackground}):Play()
+        createTween(button, {BackgroundColor3 = COLORS.DarkBackground}, TWEEN_INFO.VeryFast):Play()
+        createTween(button, {Size = UDim2.new(1, 0, 0, 30)}, TWEEN_INFO.VeryFast):Play()
     end)
     
     button.MouseButton1Up:Connect(function()
-        createTween(button, {BackgroundColor3 = COLORS.Highlight}):Play()
+        createTween(button, {BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.VeryFast):Play()
+        createTween(button, {Size = UDim2.new(1, 0, 0, 32)}, TWEEN_INFO.Spring):Play()
     end)
     
     -- Button click
     button.MouseButton1Click:Connect(function()
         playSound(SOUNDS.Click)
-        createRipple(button)
+        createRipple(button, UserInputService:GetMouseLocation())
         callback()
     end)
+    
+    -- Animate button creation
+    button.BackgroundTransparency = 1
+    button.TextTransparency = 1
+    buttonStroke.Transparency = 1
+    
+    createTween(button, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(button, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(buttonStroke, {Transparency = 0.7}, TWEEN_INFO.Medium):Play()
     
     -- Return button for chaining
     return {
@@ -671,7 +971,10 @@ function RedGlowUI:AddButton(parent, text, callback)
         
         -- Set text
         SetText = function(_, newText)
+            createTween(button, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+            wait(0.1)
             button.Text = newText
+            createTween(button, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
         end
     }
 end
@@ -715,6 +1018,9 @@ function RedGlowUI:AddToggle(parent, text, default, callback)
     toggleCorner.CornerRadius = UDim.new(1, 0)
     toggleCorner.Parent = toggleButton
     
+    -- Add subtle glow for on state
+    local toggleGlow = createGlow(toggleButton, UDim2.new(1, 20, 1, 20), UDim2.new(0, -10, 0, -10), default and 0.7 or 1)
+    
     -- Create toggle indicator
     local toggleIndicator = Instance.new("Frame")
     toggleIndicator.Name = "Indicator"
@@ -729,6 +1035,9 @@ function RedGlowUI:AddToggle(parent, text, default, callback)
     local indicatorCorner = Instance.new("UICorner")
     indicatorCorner.CornerRadius = UDim.new(1, 0)
     indicatorCorner.Parent = toggleIndicator
+    
+    -- Add subtle shadow to indicator
+    createShadow(toggleIndicator, UDim2.new(1, 6, 1, 6), UDim2.new(0, -3, 0, -3), 0.5)
     
     -- Create hitbox
     local toggleHitbox = Instance.new("TextButton")
@@ -746,14 +1055,21 @@ function RedGlowUI:AddToggle(parent, text, default, callback)
     local function updateToggle()
         enabled = not enabled
         
-        -- Update visuals
+        -- Update visuals with smooth animation
         if enabled then
-            createTween(toggleButton, {BackgroundColor3 = COLORS.Accent}):Play()
-            createTween(toggleIndicator, {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+            createTween(toggleButton, {BackgroundColor3 = COLORS.Accent}, TWEEN_INFO.Spring):Play()
+            createTween(toggleIndicator, {Position = UDim2.new(1, -18, 0.5, -8)}, TWEEN_INFO.Spring):Play()
+            createTween(toggleGlow, {ImageTransparency = 0.7}, TWEEN_INFO.Medium):Play()
         else
-            createTween(toggleButton, {BackgroundColor3 = COLORS.Background}):Play()
-            createTween(toggleIndicator, {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+            createTween(toggleButton, {BackgroundColor3 = COLORS.Background}, TWEEN_INFO.Spring):Play()
+            createTween(toggleIndicator, {Position = UDim2.new(0, 2, 0.5, -8)}, TWEEN_INFO.Spring):Play()
+            createTween(toggleGlow, {ImageTransparency = 1}, TWEEN_INFO.Medium):Play()
         end
+        
+        -- Add subtle bounce effect
+        createTween(toggleIndicator, {Size = UDim2.new(0, 14, 0, 14)}, TWEEN_INFO.VeryFast):Play()
+        wait(0.05)
+        createTween(toggleIndicator, {Size = UDim2.new(0, 16, 0, 16)}, TWEEN_INFO.Spring):Play()
         
         -- Play sound
         playSound(SOUNDS.Toggle)
@@ -764,6 +1080,28 @@ function RedGlowUI:AddToggle(parent, text, default, callback)
     
     -- Toggle click
     toggleHitbox.MouseButton1Click:Connect(updateToggle)
+    
+    -- Hover effect
+    toggleHitbox.MouseEnter:Connect(function()
+        createTween(toggleButton, {BackgroundColor3 = enabled and COLORS.AccentDark or COLORS.Highlight}, TWEEN_INFO.Fast):Play()
+        playSound(SOUNDS.Hover, 0.2)
+    end)
+    
+    toggleHitbox.MouseLeave:Connect(function()
+        createTween(toggleButton, {BackgroundColor3 = enabled and COLORS.Accent or COLORS.Background}, TWEEN_INFO.Fast):Play()
+    end)
+    
+    -- Animate toggle creation
+    toggleContainer.BackgroundTransparency = 1
+    toggleLabel.TextTransparency = 1
+    toggleButton.BackgroundTransparency = 1
+    toggleIndicator.BackgroundTransparency = 1
+    
+    createTween(toggleLabel, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(toggleButton, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(toggleIndicator, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
     
     -- Return toggle for chaining
     return {
@@ -869,6 +1207,9 @@ function RedGlowUI:AddSlider(parent, text, min, max, default, callback)
     indicatorCorner.CornerRadius = UDim.new(1, 0)
     indicatorCorner.Parent = sliderIndicator
     
+    -- Add subtle shadow to indicator
+    createShadow(sliderIndicator, UDim2.new(1, 6, 1, 6), UDim2.new(0, -3, 0, -3), 0.5)
+    
     -- Create hitbox
     local sliderHitbox = Instance.new("TextButton")
     sliderHitbox.Name = "Hitbox"
@@ -887,15 +1228,20 @@ function RedGlowUI:AddSlider(parent, text, min, max, default, callback)
         local sizeX = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
         local newValue = math.floor(min + ((max - min) * sizeX))
         
-        -- Update visuals
-        sliderFill.Size = UDim2.new(sizeX, 0, 1, 0)
-        sliderIndicator.Position = UDim2.new(sizeX, -6, 0.5, -6)
+        -- Update visuals with smooth animation
+        createTween(sliderFill, {Size = UDim2.new(sizeX, 0, 1, 0)}, TWEEN_INFO.VeryFast):Play()
+        createTween(sliderIndicator, {Position = UDim2.new(sizeX, -6, 0.5, -6)}, TWEEN_INFO.VeryFast):Play()
         sliderValue.Text = tostring(newValue)
         
         -- Update value if changed
         if newValue ~= value then
             value = newValue
             callback(value)
+            
+            -- Add subtle pulse effect to value
+            createTween(sliderValue, {TextSize = 16}, TWEEN_INFO.VeryFast):Play()
+            wait(0.05)
+            createTween(sliderValue, {TextSize = 14}, TWEEN_INFO.Fast):Play()
         end
     end
     
@@ -903,12 +1249,21 @@ function RedGlowUI:AddSlider(parent, text, min, max, default, callback)
     sliderHitbox.MouseButton1Down:Connect(function(input)
         dragging = true
         updateSlider(input)
+        
+        -- Add subtle grow effect to indicator
+        createTween(sliderIndicator, {Size = UDim2.new(0, 14, 0, 14)}, TWEEN_INFO.VeryFast):Play()
+        
         playSound(SOUNDS.Slider, 0.3)
     end)
     
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+            if dragging then
+                dragging = false
+                
+                -- Add subtle shrink effect to indicator
+                createTween(sliderIndicator, {Size = UDim2.new(0, 12, 0, 12)}, TWEEN_INFO.Spring):Play()
+            end
         end
     end)
     
@@ -917,6 +1272,32 @@ function RedGlowUI:AddSlider(parent, text, min, max, default, callback)
             updateSlider(input)
         end
     end)
+    
+    -- Hover effect
+    sliderHitbox.MouseEnter:Connect(function()
+        createTween(sliderFrame, {BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.Fast):Play()
+        playSound(SOUNDS.Hover, 0.2)
+    end)
+    
+    sliderHitbox.MouseLeave:Connect(function()
+        createTween(sliderFrame, {BackgroundColor3 = COLORS.Background}, TWEEN_INFO.Fast):Play()
+    end)
+    
+    -- Animate slider creation
+    sliderLabel.TextTransparency = 1
+    sliderValue.TextTransparency = 1
+    sliderFrame.BackgroundTransparency = 1
+    sliderFill.BackgroundTransparency = 1
+    sliderIndicator.BackgroundTransparency = 1
+    
+    createTween(sliderLabel, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(sliderValue, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(sliderFrame, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(sliderFill, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(sliderIndicator, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
     
     -- Return slider for chaining
     return {
@@ -927,9 +1308,17 @@ function RedGlowUI:AddSlider(parent, text, min, max, default, callback)
             newValue = math.clamp(newValue, min, max)
             local sizeX = (newValue - min) / (max - min)
             
-            -- Update visuals
-            createTween(sliderFill, {Size = UDim2.new(sizeX, 0, 1, 0)}):Play()
-            createTween(sliderIndicator, {Position = UDim2.new(sizeX, -6, 0.5, -6)}):Play()
+            -- Update visuals with smooth animation
+            createTween(sliderFill, {Size = UDim2.new(sizeX, 0, 1, 0)}, TWEEN_INFO.Spring):Play()
+            createTween(sliderIndicator, {Position = UDim2.new(sizeX, -6, 0.5, -6)}, TWEEN_INFO.Spring):Play()
+            
+            -- Ad  {Position = UDim2.new(sizeX, -6, 0.5, -6)}, TWEEN_INFO.Spring):Play()
+            
+            -- Add subtle pulse effect to value
+            createTween(sliderValue, {TextSize = 16}, TWEEN_INFO.VeryFast):Play()
+            wait(0.05)
+            createTween(sliderValue, {TextSize = 14}, TWEEN_INFO.Fast):Play()
+            
             sliderValue.Text = tostring(newValue)
             
             -- Update value
@@ -984,6 +1373,9 @@ function RedGlowUI:AddTextbox(parent, text, placeholder, default, callback)
     textboxCorner.CornerRadius = UDim.new(0, 4)
     textboxCorner.Parent = textboxFrame
     
+    -- Add subtle stroke
+    local textboxStroke = createStroke(textboxFrame, COLORS.Accent, 1, 0.7)
+    
     -- Create textbox
     local textbox = Instance.new("TextBox")
     textbox.Name = "Textbox"
@@ -1002,13 +1394,37 @@ function RedGlowUI:AddTextbox(parent, text, placeholder, default, callback)
     
     -- Textbox focus
     textbox.Focused:Connect(function()
-        createTween(textboxFrame, {BackgroundColor3 = COLORS.Highlight}):Play()
+        createTween(textboxFrame, {BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.Fast):Play()
+        createTween(textboxStroke, {Transparency = 0.3}, TWEEN_INFO.Fast):Play()
+        
+        -- Add subtle grow effect
+        createTween(textboxFrame, {Size = UDim2.new(1, 0, 0, 27)}, TWEEN_INFO.Fast):Play()
+        
+        playSound(SOUNDS.Hover, 0.2)
     end)
     
     textbox.FocusLost:Connect(function(enterPressed)
-        createTween(textboxFrame, {BackgroundColor3 = COLORS.Background}):Play()
+        createTween(textboxFrame, {BackgroundColor3 = COLORS.Background}, TWEEN_INFO.Fast):Play()
+        createTween(textboxStroke, {Transparency = 0.7}, TWEEN_INFO.Fast):Play()
+        
+        -- Add subtle shrink effect
+        createTween(textboxFrame, {Size = UDim2.new(1, 0, 0, 25)}, TWEEN_INFO.Spring):Play()
+        
         callback(textbox.Text, enterPressed)
     end)
+    
+    -- Animate textbox creation
+    textboxLabel.TextTransparency = 1
+    textboxFrame.BackgroundTransparency = 1
+    textbox.TextTransparency = 1
+    textboxStroke.Transparency = 1
+    
+    createTween(textboxLabel, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(textboxFrame, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(textbox, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(textboxStroke, {Transparency = 0.7}, TWEEN_INFO.Medium):Play()
     
     -- Return textbox for chaining
     return {
@@ -1016,7 +1432,10 @@ function RedGlowUI:AddTextbox(parent, text, placeholder, default, callback)
         
         -- Set text
         SetText = function(_, newText)
+            createTween(textbox, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+            wait(0.1)
             textbox.Text = newText
+            createTween(textbox, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
             callback(newText, false)
         end,
         
@@ -1067,6 +1486,9 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
     dropdownCorner.CornerRadius = UDim.new(0, 4)
     dropdownCorner.Parent = dropdownFrame
     
+    -- Add subtle stroke
+    local dropdownStroke = createStroke(dropdownFrame, COLORS.Accent, 1, 0.7)
+    
     -- Create dropdown text
     local dropdownText = Instance.new("TextLabel")
     dropdownText.Name = "Text"
@@ -1112,6 +1534,9 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
     listCorner.CornerRadius = UDim.new(0, 4)
     listCorner.Parent = dropdownList
     
+    -- Add shadow to list
+    createShadow(dropdownList, UDim2.new(1, 10, 1, 10), UDim2.new(0, -5, 0, -5), 0.5)
+    
     -- Create list layout
     local listLayout = Instance.new("UIListLayout")
     listLayout.Padding = UDim.new(0, 0)
@@ -1156,20 +1581,21 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
             -- Option hover effect
             optionButton.MouseEnter:Connect(function()
                 if option ~= value then
-                    createTween(optionButton, {BackgroundTransparency = 0.9, BackgroundColor3 = COLORS.Highlight}):Play()
+                    createTween(optionButton, {BackgroundTransparency = 0.9, BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.Fast):Play()
                 end
                 playSound(SOUNDS.Hover, 0.2)
             end)
             
             optionButton.MouseLeave:Connect(function()
                 if option ~= value then
-                    createTween(optionButton, {BackgroundTransparency = 1}):Play()
+                    createTween(optionButton, {BackgroundTransparency = 1}, TWEEN_INFO.Fast):Play()
                 end
             end)
             
             -- Option click
             optionButton.MouseButton1Click:Connect(function()
                 playSound(SOUNDS.Click)
+                createRipple(optionButton)
                 
                 -- Update value
                 value = option
@@ -1178,7 +1604,7 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
                 -- Update visuals
                 for _, child in pairs(dropdownList:GetChildren()) do
                     if child:IsA("TextButton") then
-                        createTween(child, {TextColor3 = child.Text == value and COLORS.Accent or COLORS.Text}):Play()
+                        createTween(child, {TextColor3 = child.Text == value and COLORS.Accent or COLORS.Text}, TWEEN_INFO.Fast):Play()
                     end
                 end
                 
@@ -1195,17 +1621,29 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
     function toggleDropdown()
         open = not open
         
-        -- Update visuals
+        -- Update visuals with smooth animation
         if open then
             populateList()
             dropdownList.Visible = true
-            createTween(dropdownArrow, {Rotation = 180}):Play()
-            createTween(dropdownList, {Size = UDim2.new(1, 0, 0, math.min(#options * 25, 150))}):Play()
-        else
-            createTween(dropdownArrow, {Rotation = 0}):Play()
-            createTween(dropdownList, {Size = UDim2.new(1, 0, 0, 0)}):Play()
+            createTween(dropdownArrow, {Rotation = 180}, TWEEN_INFO.Spring):Play()
+            createTween(dropdownList, {Size = UDim2.new(1, 0, 0, math.min(#options * 25, 150))}, TWEEN_INFO.Spring):Play()
+            createTween(dropdownStroke, {Transparency = 0.3}, TWEEN_INFO.Fast):Play()
             
-            wait(TWEEN_TIME)
+            -- Add subtle grow effect
+            createTween(dropdownFrame, {Size = UDim2.new(1, 0, 0, 27)}, TWEEN_INFO.Fast):Play()
+            
+            playSound(SOUNDS.Whoosh, 0.2, 1.1)
+        else
+            createTween(dropdownArrow, {Rotation = 0}, TWEEN_INFO.Spring):Play()
+            createTween(dropdownList, {Size = UDim2.new(1, 0, 0, 0)}, TWEEN_INFO.Spring):Play()
+            createTween(dropdownStroke, {Transparency = 0.7}, TWEEN_INFO.Fast):Play()
+            
+            -- Add subtle shrink effect
+            createTween(dropdownFrame, {Size = UDim2.new(1, 0, 0, 25)}, TWEEN_INFO.Spring):Play()
+            
+            playSound(SOUNDS.Whoosh, 0.2, 0.9)
+            
+            wait(0.3)
             if not open then
                 dropdownList.Visible = false
             end
@@ -1215,7 +1653,18 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
     -- Dropdown click
     dropdownHitbox.MouseButton1Click:Connect(function()
         playSound(SOUNDS.Click)
+        createRipple(dropdownFrame)
         toggleDropdown()
+    end)
+    
+    -- Hover effect
+    dropdownHitbox.MouseEnter:Connect(function()
+        createTween(dropdownFrame, {BackgroundColor3 = COLORS.Highlight}, TWEEN_INFO.Fast):Play()
+        playSound(SOUNDS.Hover, 0.2)
+    end)
+    
+    dropdownHitbox.MouseLeave:Connect(function()
+        createTween(dropdownFrame, {BackgroundColor3 = COLORS.Background}, TWEEN_INFO.Fast):Play()
     end)
     
     -- Close dropdown when clicking elsewhere
@@ -1233,6 +1682,21 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
         end
     end)
     
+    -- Animate dropdown creation
+    dropdownLabel.TextTransparency = 1
+    dropdownFrame.BackgroundTransparency = 1
+    dropdownText.TextTransparency = 1
+    dropdownArrow.TextTransparency = 1
+    dropdownStroke.Transparency = 1
+    
+    createTween(dropdownLabel, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(dropdownFrame, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(dropdownText, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(dropdownArrow, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(dropdownStroke, {Transparency = 0.7}, TWEEN_INFO.Medium):Play()
+    
     -- Return dropdown for chaining
     return {
         Instance = dropdownContainer,
@@ -1242,7 +1706,12 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
             for _, option in ipairs(options) do
                 if option == newValue then
                     value = newValue
+                    
+                    createTween(dropdownText, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+                    wait(0.1)
                     dropdownText.Text = newValue
+                    createTween(dropdownText, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
+                    
                     callback(value)
                     return
                 end
@@ -1269,470 +1738,27 @@ function RedGlowUI:AddDropdown(parent, text, options, default, callback)
             
             if not valueExists and #options > 0 then
                 value = options[1]
+                
+                createTween(dropdownText, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+                wait(0.1)
                 dropdownText.Text = value
+                createTween(dropdownText, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
+                
                 callback(value)
             elseif #options == 0 then
                 value = ""
+                
+                createTween(dropdownText, {TextTransparency = 0.5}, TWEEN_INFO.Fast):Play()
+                wait(0.1)
                 dropdownText.Text = ""
+                createTween(dropdownText, {TextTransparency = 0}, TWEEN_INFO.Fast):Play()
             end
             
             -- Update list if open
             if open then
                 populateList()
-                dropdownList.Size = UDim2.new(1, 0, 0, math.min(#options * 25, 150))
+                createTween(dropdownList, {Size = UDim2.new(1, 0, 0, math.min(#options * 25, 150))}, TWEEN_INFO.Spring):Play()
             end
-        end
-    }
-end
-
--- Add a color picker
-function RedGlowUI:AddColorPicker(parent, text, default, callback)
-    callback = callback or function() end
-    default = default or Color3.fromRGB(255, 255, 255)
-    
-    local colorPickerContainer = Instance.new("Frame")
-    colorPickerContainer.Name = "ColorPickerContainer"
-    colorPickerContainer.BackgroundTransparency = 1
-    colorPickerContainer.Size = UDim2.new(1, 0, 0, 50)
-    colorPickerContainer.ZIndex = parent.ZIndex
-    colorPickerContainer.Parent = parent
-    
-    local colorPickerLabel = Instance.new("TextLabel")
-    colorPickerLabel.Name = "Label"
-    colorPickerLabel.BackgroundTransparency = 1
-    colorPickerLabel.Position = UDim2.new(0, 0, 0, 0)
-    colorPickerLabel.Size = UDim2.new(1, -40, 0, 20)
-    colorPickerLabel.ZIndex = parent.ZIndex
-    colorPickerLabel.Font = Enum.Font.Gotham
-    colorPickerLabel.Text = text
-    colorPickerLabel.TextColor3 = COLORS.Text
-    colorPickerLabel.TextSize = 14
-    colorPickerLabel.TextXAlignment = Enum.TextXAlignment.Left
-    colorPickerLabel.Parent = colorPickerContainer
-    
-    local colorDisplay = Instance.new("Frame")
-    colorDisplay.Name = "ColorDisplay"
-    colorDisplay.BackgroundColor3 = default
-    colorDisplay.BorderSizePixel = 0
-    colorDisplay.Position = UDim2.new(1, -30, 0, 0)
-    colorDisplay.Size = UDim2.new(0, 30, 0, 20)
-    colorDisplay.ZIndex = parent.ZIndex
-    colorDisplay.Parent = colorPickerContainer
-    
-    -- Add corner
-    local displayCorner = Instance.new("UICorner")
-    displayCorner.CornerRadius = UDim.new(0, 4)
-    displayCorner.Parent = colorDisplay
-    
-    -- Create color picker button
-    local colorPickerButton = Instance.new("TextButton")
-    colorPickerButton.Name = "Button"
-    colorPickerButton.BackgroundColor3 = COLORS.Background
-    colorPickerButton.BorderSizePixel = 0
-    colorPickerButton.Position = UDim2.new(0, 0, 0, 25)
-    colorPickerButton.Size = UDim2.new(1, 0, 0, 25)
-    colorPickerButton.ZIndex = parent.ZIndex
-    colorPickerButton.Font = Enum.Font.Gotham
-    colorPickerButton.Text = "Pick a color"
-    colorPickerButton.TextColor3 = COLORS.Text
-    colorPickerButton.TextSize = 14
-    colorPickerButton.Parent = colorPickerContainer
-    
-    -- Add corner
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 4)
-    buttonCorner.Parent = colorPickerButton
-    
-    -- Button hover effect
-    colorPickerButton.MouseEnter:Connect(function()
-        createTween(colorPickerButton, {BackgroundColor3 = COLORS.Highlight}):Play()
-        playSound(SOUNDS.Hover, 0.2)
-    end)
-    
-    colorPickerButton.MouseLeave:Connect(function()
-        createTween(colorPickerButton, {BackgroundColor3 = COLORS.Background}):Play()
-    end)
-    
-    -- Create color picker popup
-    local colorPickerPopup = Instance.new("Frame")
-    colorPickerPopup.Name = "ColorPickerPopup"
-    colorPickerPopup.BackgroundColor3 = COLORS.Background
-    colorPickerPopup.BorderSizePixel = 0
-    colorPickerPopup.Position = UDim2.new(0, 0, 1, 10)
-    colorPickerPopup.Size = UDim2.new(1, 0, 0, 200)
-    colorPickerPopup.ZIndex = parent.ZIndex + 10
-    colorPickerPopup.Visible = false
-    colorPickerPopup.Parent = colorPickerContainer
-    
-    -- Add corner
-    local popupCorner = Instance.new("UICorner")
-    popupCorner.CornerRadius = UDim.new(0, 6)
-    popupCorner.Parent = colorPickerPopup
-    
-    -- Create color picker UI
-    -- This is a simplified color picker for demonstration
-    -- A full implementation would include HSV color selection
-    
-    -- Create RGB sliders
-    local function createColorSlider(name, color, value, yPos)
-        local sliderContainer = Instance.new("Frame")
-        sliderContainer.Name = name .. "Container"
-        sliderContainer.BackgroundTransparency = 1
-        sliderContainer.Position = UDim2.new(0, 10, 0, yPos)
-        sliderContainer.Size = UDim2.new(1, -20, 0, 30)
-        sliderContainer.ZIndex = parent.ZIndex + 11
-        sliderContainer.Parent = colorPickerPopup
-        
-        local sliderLabel = Instance.new("TextLabel")
-        sliderLabel.Name = "Label"
-        sliderLabel.BackgroundTransparency = 1
-        sliderLabel.Position = UDim2.new(0, 0, 0, 0)
-        sliderLabel.Size = UDim2.new(0, 20, 1, 0)
-        sliderLabel.ZIndex = parent.ZIndex + 11
-        sliderLabel.Font = Enum.Font.GothamBold
-        sliderLabel.Text = name
-        sliderLabel.TextColor3 = color
-        sliderLabel.TextSize = 14
-        sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-        sliderLabel.Parent = sliderContainer
-        
-        local sliderValue = Instance.new("TextLabel")
-        sliderValue.Name = "Value"
-        sliderValue.BackgroundTransparency = 1
-        sliderValue.Position = UDim2.new(1, -30, 0, 0)
-        sliderValue.Size = UDim2.new(0, 30, 1, 0)
-        sliderValue.ZIndex = parent.ZIndex + 11
-        sliderValue.Font = Enum.Font.Gotham
-        sliderValue.Text = tostring(value)
-        sliderValue.TextColor3 = COLORS.Text
-        sliderValue.TextSize = 14
-        sliderValue.TextXAlignment = Enum.TextXAlignment.Right
-        sliderValue.Parent = sliderContainer
-        
-        local sliderFrame = Instance.new("Frame")
-        sliderFrame.Name = "SliderFrame"
-        sliderFrame.BackgroundColor3 = COLORS.DarkBackground
-        sliderFrame.BorderSizePixel = 0
-        sliderFrame.Position = UDim2.new(0, 25, 0.5, -2)
-        sliderFrame.Size = UDim2.new(1, -65, 0, 4)
-        sliderFrame.ZIndex = parent.ZIndex + 11
-        sliderFrame.Parent = sliderContainer
-        
-        -- Add corner
-        local sliderCorner = Instance.new("UICorner")
-        sliderCorner.CornerRadius = UDim.new(1, 0)
-        sliderCorner.Parent = sliderFrame
-        
-        -- Create slider fill
-        local sliderFill = Instance.new("Frame")
-        sliderFill.Name = "Fill"
-        sliderFill.BackgroundColor3 = color
-        sliderFill.BorderSizePixel = 0
-        sliderFill.Size = UDim2.new(value / 255, 0, 1, 0)
-        sliderFill.ZIndex = parent.ZIndex + 12
-        sliderFill.Parent = sliderFrame
-        
-        -- Add corner to fill
-        local fillCorner = Instance.new("UICorner")
-        fillCorner.CornerRadius = UDim.new(1, 0)
-        fillCorner.Parent = sliderFill
-        
-        -- Create slider indicator
-        local sliderIndicator = Instance.new("Frame")
-        sliderIndicator.Name = "Indicator"
-        sliderIndicator.BackgroundColor3 = COLORS.Text
-        sliderIndicator.BorderSizePixel = 0
-        sliderIndicator.Position = UDim2.new(value / 255, -6, 0.5, -6)
-        sliderIndicator.Size = UDim2.new(0, 12, 0, 12)
-        sliderIndicator.ZIndex = parent.ZIndex + 13
-        sliderIndicator.Parent = sliderFrame
-        
-        -- Add corner to indicator
-        local indicatorCorner = Instance.new("UICorner")
-        indicatorCorner.CornerRadius = UDim.new(1, 0)
-        indicatorCorner.Parent = sliderIndicator
-        
-        -- Create hitbox
-        local sliderHitbox = Instance.new("TextButton")
-        sliderHitbox.Name = "Hitbox"
-        sliderHitbox.BackgroundTransparency = 1
-        sliderHitbox.Size = UDim2.new(1, 0, 1, 0)
-        sliderHitbox.ZIndex = parent.ZIndex + 14
-        sliderHitbox.Text = ""
-        sliderHitbox.Parent = sliderFrame
-        
-        -- Slider state
-        local dragging = false
-        
-        -- Update slider function
-        local function updateSlider(input)
-            local sizeX = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-            local newValue = math.floor(sizeX * 255)
-            
-            -- Update visuals
-            sliderFill.Size = UDim2.new(sizeX, 0, 1, 0)
-            sliderIndicator.Position = UDim2.new(sizeX, -6, 0.5, -6)
-            sliderValue.Text = tostring(newValue)
-            
-            return newValue
-        end
-        
-        -- Slider input
-        sliderHitbox.MouseButton1Down:Connect(function(input)
-            dragging = true
-            local newValue = updateSlider(input)
-            
-            -- Update color
-            local r = name == "R" and newValue or tonumber(colorPickerPopup.RContainer.Value.Text)
-            local g = name == "G" and newValue or tonumber(colorPickerPopup.GContainer.Value.Text)
-            local b = name == "B" and newValue or tonumber(colorPickerPopup.BContainer.Value.Text)
-            
-            local newColor = Color3.fromRGB(r, g, b)
-            colorDisplay.BackgroundColor3 = newColor
-            callback(newColor)
-            
-            playSound(SOUNDS.Slider, 0.3)
-        end)
-        
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-        
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local newValue = updateSlider(input)
-                
-                -- Update color
-                local r = name == "R" and newValue or tonumber(colorPickerPopup.RContainer.Value.Text)
-                local g = name == "G" and newValue or tonumber(colorPickerPopup.GContainer.Value.Text)
-                local b = name == "B" and newValue or tonumber(colorPickerPopup.BContainer.Value.Text)
-                
-                local newColor = Color3.fromRGB(r, g, b)
-                colorDisplay.BackgroundColor3 = newColor
-                callback(newColor)
-            end
-        end)
-        
-        return sliderContainer
-    end
-    
-    -- Create RGB sliders
-    local r, g, b = math.floor(default.R * 255), math.floor(default.G * 255), math.floor(default.B * 255)
-    createColorSlider("R", Color3.fromRGB(255, 50, 50), r, 20)
-    createColorSlider("G", Color3.fromRGB(50, 255, 50), g, 60)
-    createColorSlider("B", Color3.fromRGB(50, 50, 255), b, 100)
-    
-    -- Create apply button
-    local applyButton = Instance.new("TextButton")
-    applyButton.Name = "ApplyButton"
-    applyButton.BackgroundColor3 = COLORS.Accent
-    applyButton.BorderSizePixel = 0
-    applyButton.Position = UDim2.new(0.5, -50, 1, -40)
-    applyButton.Size = UDim2.new(0, 100, 0, 30)
-    applyButton.ZIndex = parent.ZIndex + 11
-    applyButton.Font = Enum.Font.GothamSemibold
-    applyButton.Text = "Apply"
-    applyButton.TextColor3 = COLORS.Text
-    applyButton.TextSize = 14
-    applyButton.Parent = colorPickerPopup
-    
-    -- Add corner
-    local applyCorner = Instance.new("UICorner")
-    applyCorner.CornerRadius = UDim.new(0, 4)
-    applyCorner.Parent = applyButton
-    
-    -- Button hover effect
-    applyButton.MouseEnter:Connect(function()
-        createTween(applyButton, {BackgroundColor3 = COLORS.AccentDark}):Play()
-        playSound(SOUNDS.Hover, 0.2)
-    end)
-    
-    applyButton.MouseLeave:Connect(function()
-        createTween(applyButton, {BackgroundColor3 = COLORS.Accent}):Play()
-    end)
-    
-    -- Button click
-    applyButton.MouseButton1Click:Connect(function()
-        playSound(SOUNDS.Click)
-        createRipple(applyButton)
-        
-        -- Hide popup
-        colorPickerPopup.Visible = false
-    end)
-    
-    -- Color picker state
-    local open = false
-    
-    -- Toggle color picker function
-    local function toggleColorPicker()
-        open = not open
-        colorPickerPopup.Visible = open
-    end
-    
-    -- Color picker button click
-    colorPickerButton.MouseButton1Click:Connect(function()
-        playSound(SOUNDS.Click)
-        createRipple(colorPickerButton)
-        toggleColorPicker()
-    end)
-    
-    -- Close color picker when clicking elsewhere
-    UserInputService.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = UserInputService:GetMouseLocation()
-            local popupPos = colorPickerPopup.AbsolutePosition
-            local popupSize = colorPickerPopup.AbsoluteSize
-            local buttonPos = colorPickerButton.AbsolutePosition
-            local buttonSize = colorPickerButton.AbsoluteSize
-            
-            if open and not (mousePos.X >= popupPos.X and mousePos.X <= popupPos.X + popupSize.X and mousePos.Y >= popupPos.Y and mousePos.Y <= popupPos.Y + popupSize.Y) and not (mousePos.X >= buttonPos.X and mousePos.X <= buttonPos.X + buttonSize.X and mousePos.Y >= buttonPos.Y and mousePos.Y <= buttonPos.Y + buttonSize.Y) then
-                toggleColorPicker()
-            end
-        end
-    end)
-    
-    -- Return color picker for chaining
-    return {
-        Instance = colorPickerContainer,
-        
-        -- Set color
-        SetColor = function(_, newColor)
-            colorDisplay.BackgroundColor3 = newColor
-            
-            -- Update sliders
-            local r, g, b = math.floor(newColor.R * 255), math.floor(newColor.G * 255), math.floor(newColor.B * 255)
-            
-            colorPickerPopup.RContainer.Value.Text = tostring(r)
-            colorPickerPopup.RContainer.SliderFrame.Fill.Size = UDim2.new(r / 255, 0, 1, 0)
-            colorPickerPopup.RContainer.SliderFrame.Indicator.Position = UDim2.new(r / 255, -6, 0.5, -6)
-            
-            colorPickerPopup.GContainer.Value.Text = tostring(g)
-            colorPickerPopup.GContainer.SliderFrame.Fill.Size = UDim2.new(g / 255, 0, 1, 0)
-            colorPickerPopup.GContainer.SliderFrame.Indicator.Position = UDim2.new(g / 255, -6, 0.5, -6)
-            
-            colorPickerPopup.BContainer.Value.Text = tostring(b)
-            colorPickerPopup.BContainer.SliderFrame.Fill.Size = UDim2.new(b / 255, 0, 1, 0)
-            colorPickerPopup.BContainer.SliderFrame.Indicator.Position = UDim2.new(b / 255, -6, 0.5, -6)
-            
-            callback(newColor)
-        end,
-        
-        -- Get color
-        GetColor = function()
-            return colorDisplay.BackgroundColor3
-        end
-    }
-end
-
--- Add a keybind
-function RedGlowUI:AddKeybind(parent, text, default, callback)
-    callback = callback or function() end
-    default = default or Enum.KeyCode.Unknown
-    
-    local keybindContainer = Instance.new("Frame")
-    keybindContainer.Name = "KeybindContainer"
-    keybindContainer.BackgroundTransparency = 1
-    keybindContainer.Size = UDim2.new(1, 0, 0, 32)
-    keybindContainer.ZIndex = parent.ZIndex
-    keybindContainer.Parent = parent
-    
-    local keybindLabel = Instance.new("TextLabel")
-    keybindLabel.Name = "Label"
-    keybindLabel.BackgroundTransparency = 1
-    keybindLabel.Position = UDim2.new(0, 0, 0, 0)
-    keybindLabel.Size = UDim2.new(1, -80, 1, 0)
-    keybindLabel.ZIndex = parent.ZIndex
-    keybindLabel.Font = Enum.Font.Gotham
-    keybindLabel.Text = text
-    keybindLabel.TextColor3 = COLORS.Text
-    keybindLabel.TextSize = 14
-    keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
-    keybindLabel.Parent = keybindContainer
-    
-    local keybindButton = Instance.new("TextButton")
-    keybindButton.Name = "Button"
-    keybindButton.BackgroundColor3 = COLORS.Background
-    keybindButton.BorderSizePixel = 0
-    keybindButton.Position = UDim2.new(1, -70, 0, 0)
-    keybindButton.Size = UDim2.new(0, 70, 1, 0)
-    keybindButton.ZIndex = parent.ZIndex
-    keybindButton.Font = Enum.Font.Gotham
-    keybindButton.Text = default ~= Enum.KeyCode.Unknown and default.Name or "None"
-    keybindButton.TextColor3 = COLORS.Text
-    keybindButton.TextSize = 14
-    keybindButton.Parent = keybindContainer
-    
-    -- Add corner
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 4)
-    buttonCorner.Parent = keybindButton
-    
-    -- Button hover effect
-    keybindButton.MouseEnter:Connect(function()
-        createTween(keybindButton, {BackgroundColor3 = COLORS.Highlight}):Play()
-        playSound(SOUNDS.Hover, 0.2)
-    end)
-    
-    keybindButton.MouseLeave:Connect(function()
-        createTween(keybindButton, {BackgroundColor3 = COLORS.Background}):Play()
-    end)
-    
-    -- Keybind state
-    local key = default
-    local listening = false
-    
-    -- Update keybind function
-    local function updateKeybind(input)
-        key = input.KeyCode
-        keybindButton.Text = key ~= Enum.KeyCode.Unknown and key.Name or "None"
-        callback(key)
-    end
-    
-    -- Toggle listening function
-    local function toggleListening()
-        listening = not listening
-        
-        if listening then
-            keybindButton.Text = "..."
-            createTween(keybindButton, {BackgroundColor3 = COLORS.Accent}):Play()
-        else
-            keybindButton.Text = key ~= Enum.KeyCode.Unknown and key.Name or "None"
-            createTween(keybindButton, {BackgroundColor3 = COLORS.Background}):Play()
-        end
-    end
-    
-    -- Keybind button click
-    keybindButton.MouseButton1Click:Connect(function()
-        playSound(SOUNDS.Click)
-        toggleListening()
-    end)
-    
-    -- Listen for key press
-    UserInputService.InputBegan:Connect(function(input)
-        if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-            updateKeybind(input)
-            toggleListening()
-        elseif not listening and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == key then
-            callback(key)
-        end
-    end)
-    
-    -- Return keybind for chaining
-    return {
-        Instance = keybindContainer,
-        
-        -- Set key
-        SetKey = function(_, newKey)
-            key = newKey
-            keybindButton.Text = key ~= Enum.KeyCode.Unknown and key.Name or "None"
-            callback(key)
-        end,
-        
-        -- Get key
-        GetKey = function()
-            return key
         end
     }
 end
@@ -1790,7 +1816,7 @@ function RedGlowUI:CreateNotification(title, text, duration, notifType)
     notifCorner.Parent = notification
     
     -- Add shadow
-    createShadow(notification)
+    createShadow(notification, UDim2.new(1, 20, 1, 20), UDim2.new(0, -10, 0, -10), 0.5)
     
     -- Create notification accent
     local notifAccent = Instance.new("Frame")
@@ -1863,30 +1889,54 @@ function RedGlowUI:CreateNotification(title, text, duration, notifType)
     
     -- Close button hover effect
     closeButton.MouseEnter:Connect(function()
-        createTween(closeButton, {TextColor3 = COLORS.Text}):Play()
+        createTween(closeButton, {TextColor3 = COLORS.Text}, TWEEN_INFO.Fast):Play()
     end)
     
     closeButton.MouseLeave:Connect(function()
-        createTween(closeButton, {TextColor3 = COLORS.TextDark}):Play()
+        createTween(closeButton, {TextColor3 = COLORS.TextDark}, TWEEN_INFO.Fast):Play()
     end)
     
     -- Calculate notification height
     local height = 45 + notifText.TextBounds.Y
     
-    -- Show notification
+    -- Show notification with smooth animation
     notification.Size = UDim2.new(1, 0, 0, 0)
-    createTween(notification, {Size = UDim2.new(1, 0, 0, height)}, 0.3, Enum.EasingStyle.Quint):Play()
+    notification.Position = UDim2.new(0, 50, 0, 0)
+    notification.BackgroundTransparency = 1
+    notifTitle.TextTransparency = 1
+    notifText.TextTransparency = 1
+    closeButton.TextTransparency = 1
+    notifAccent.BackgroundTransparency = 1
+    
+    -- Sequence of animations
+    createTween(notification, {Size = UDim2.new(1, 0, 0, height), Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0}, TWEEN_INFO.Spring):Play()
+    wait(0.1)
+    createTween(notifAccent, {BackgroundTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(notifTitle, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    wait(0.1)
+    createTween(notifText, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    createTween(closeButton, {TextTransparency = 0}, TWEEN_INFO.Medium):Play()
+    
     playSound(SOUNDS.Notification)
     
     -- Close notification function
     local function closeNotification()
-        createTween(notification, {Size = UDim2.new(1, 0, 0, 0)}, 0.3, Enum.EasingStyle.Quint):Play()
+        createTween(notifTitle, {TextTransparency = 1}, TWEEN_INFO.Fast):Play()
+        createTween(notifText, {TextTransparency = 1}, TWEEN_INFO.Fast):Play()
+        createTween(closeButton, {TextTransparency = 1}, TWEEN_INFO.Fast):Play()
+        wait(0.1)
+        createTween(notifAccent, {BackgroundTransparency = 1}, TWEEN_INFO.Fast):Play()
+        wait(0.1)
+        createTween(notification, {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, -50, 0, 0), BackgroundTransparency = 1}, TWEEN_INFO.Spring):Play()
+        
         wait(0.3)
         notification:Destroy()
     end
     
     -- Close button click
     closeButton.MouseButton1Click:Connect(function()
+        playSound(SOUNDS.Click)
         closeNotification()
     end)
     
